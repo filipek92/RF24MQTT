@@ -3,32 +3,63 @@
 #include <fstream>
 #endif
 
-RF24MQTT::RF24MQTT( RF24& _radio,RF24Network& _network,RF24Mesh& _mesh): radio(_radio),network(_network),mesh(_mesh){};
+RF24MQTT::RF24MQTT( RF24& _radio,RF24Network& _network,RF24Mesh& _mesh): radio(_radio),network(_network),mesh(_mesh){
+  ping_time=0;
+};
 
-bool RF24MQTT::begin(uint8_t channel = MESH_DEFAULT_CHANNEL, rf24_datarate_e data_rate = RF24_1MBPS, uint32_t timeout=MESH_RENEWAL_TIMEOUT ){
-  return true;
+bool RF24MQTT::connect(const char name[]){
+  return mesh.write(name, MQTT_CONNECT_TYPE, strlen(name));
+}
+
+bool RF24MQTT::disconnect(const char name[]){
+  return mesh.write(name, MQTT_DISCON_TYPE, strlen(name));
 }
 
 uint8_t RF24MQTT::update(){
   mesh.update();
   while (network.available()) {
     RF24NetworkHeader header;
-    char payload[255];
-    char *topic;
-    char *data;
-    uint16_t len = network.read(header, &payload, sizeof(payload));
-    payload[len] = 0;
-    topic = payload;
-    uint16_t presize = strlen(topic) + 1;
-    data = payload + presize;
-    
-    if(callback) callback(topic, data, len-presize);
+    network.peek(header);
+    dispatchMessage(header);
+  }
+  if(millis()-ping_time > MQTT_PING_PERIOD){
+    Serial.print("Ping");
+    if(checkConnection()) Serial.println(" OK");
+    else Serial.println(" fail");
+    ping_time = millis();
   }
 }
+
+void RF24MQTT::dispatchMessage(RF24NetworkHeader& header){
+    if(incomingMessage(header)) return;
+    Serial.print("Received message ");
+    Serial.println((char)header.type);
+    network.read(header, NULL, 0); //Zahoď neznámý paket
+}
+
+bool RF24MQTT::incomingMessage(RF24NetworkHeader& header){
+  if(header.type != MQTT_RECIEVE_TYPE) return false;
+
+  char payload[255];
+  char *topic;
+  char *data;
+
+  uint16_t len = network.read(header, &payload, sizeof(payload));
+  payload[len] = 0;
+  topic = payload;
+  uint16_t presize = strlen(topic) + 1;
+  data = payload + presize;
+
+  if(callback) callback(topic, data, len-presize);
+
+  return true;
+}
+
 bool RF24MQTT::checkConnection(){
   RF24NetworkHeader header;
-  uint8_t data[MQTT_MAX_LENGHT]; 
-  if(!mesh.write(NULL, MQTT_PING_TYPE, 0)){
+  uint8_t data[MQTT_MAX_LENGHT];
+  ping_cnt++;
+  if(!mesh.write(&ping_cnt, MQTT_PING_TYPE, 1)){
     if(!mesh.checkConnection()){
       mesh.renewAddress();
     }
@@ -36,33 +67,18 @@ bool RF24MQTT::checkConnection(){
   }
   uint32_t start = millis();
   while(millis()-start < MQTT_PING_TIMEOUT){
+    mesh.update();
     if(network.available()){
-      byte len = network.read(header, data, MQTT_MAX_LENGHT);
-      if(header.type == MQTT_PING_TYPE) return true;
-      else proccessMessage(header, data, len);
+      network.peek(header);
+      if(header.type == MQTT_PONG_TYPE){
+        uint8_t cnt;
+        network.read(header, &cnt, 1);
+        if(cnt == ping_cnt) return true;
+      }
+      dispatchMessage(header);
     }
   }
   return false;  
-}
-
-int RF24MQTT::sendAndReply(unsigned char qtype, unsigned char atype, void* data, byte *length, byte node=0){
-  RF24NetworkHeader header;
-  uint8_t d[MQTT_MAX_LENGHT]; 
-  if(!mesh.write(data, qtype, *length, node)){
-    if(!mesh.checkConnection()){
-      mesh.renewAddress();
-    }
-    if(!mesh.write(data, qtype, *length)) return MQTT_ERROR_MESH_NET;
-  }
-  uint32_t start = millis();
-  while(millis()-start < MQTT_PING_TIMEOUT){  
-    if(network.available()){
-      byte len = network.read(header, d, MQTT_MAX_LENGHT);
-      if(header.type == atype) return 0;
-      else proccessMessage(header, d, len);
-    }
-  }
-  return MQTT_ERROR_TIMEOUT;  
 }
 
 void RF24MQTT::proccessMessage(RF24NetworkHeader& header, void* payload, byte length){
