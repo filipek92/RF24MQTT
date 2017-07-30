@@ -29,6 +29,7 @@
 #define MQTT_RECIEVE_TYPE   'R'
 
 typedef void (*mqtt_callback_t)(const char topic[], byte* payload, unsigned int length);
+typedef char *topics_t[];
 
 class RF24;
 class RF24Network;
@@ -76,7 +77,7 @@ class RF24MQTT
   bool checkConnection();
 
   bool connect(const char name[]);
-  bool disconnect(const char name[]);
+  bool disconnect();
 
   inline int publish(const char topic[], const char payload[], bool retained=false) {return publish(topic, payload, strlen(payload), retained);}
   int publish(const char topic[], void* payload, byte length, bool retained=false);
@@ -86,6 +87,7 @@ class RF24MQTT
   bool unsubscribe(const char topic[]); 
 
   void setCallback(mqtt_callback_t _callback);
+  void setStaticTopics(topics_t topics);
 
   private:
   void proccessMessage(RF24NetworkHeader& header, void* payload, byte length);
@@ -96,6 +98,9 @@ class RF24MQTT
   uint8_t ping_cnt;
 
   mqtt_callback_t callback;
+
+  char **static_topics;
+  char *client_name;
   
   RF24& radio;
   RF24Network& network;

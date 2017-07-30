@@ -8,11 +8,15 @@ RF24MQTT::RF24MQTT( RF24& _radio,RF24Network& _network,RF24Mesh& _mesh): radio(_
 };
 
 bool RF24MQTT::connect(const char name[]){
-  return mesh.write(name, MQTT_CONNECT_TYPE, strlen(name));
+  if(name) client_name = name;
+  if(!mesh.write(client_name, MQTT_CONNECT_TYPE, strlen(client_name))) return false;
+  for(byte i=0;i<sizeof(static_topics); i++){
+    subscribe(static_topics[i]);
+  }
 }
 
-bool RF24MQTT::disconnect(const char name[]){
-  return mesh.write(name, MQTT_DISCON_TYPE, strlen(name));
+bool RF24MQTT::disconnect(){
+  return mesh.write(NULL, MQTT_DISCON_TYPE, 0);
 }
 
 uint8_t RF24MQTT::update(){
@@ -59,12 +63,13 @@ bool RF24MQTT::checkConnection(){
   RF24NetworkHeader header;
   uint8_t data[MQTT_MAX_LENGHT];
   ping_cnt++;
-  if(!mesh.write(&ping_cnt, MQTT_PING_TYPE, 1)){
-    if(!mesh.checkConnection()){
-      mesh.renewAddress();
-    }
-    if(!mesh.write(NULL, MQTT_PING_TYPE, 0)) return false;
+
+  if(!mesh.checkConnection()){
+    mesh.renewAddress();
+    connect(NULL);
   }
+  if(!mesh.write(&ping_cnt, MQTT_PING_TYPE, 1)) return false;
+  
   uint32_t start = millis();
   while(millis()-start < MQTT_PING_TIMEOUT){
     mesh.update();
@@ -103,4 +108,6 @@ void RF24MQTT::setCallback(mqtt_callback_t _callback){
   callback = _callback;
 }
 
-byte getTopicFromId(uint16_t topic, char topicName[], byte length); 
+void RF24MQTT::setStaticTopics(topics_t topics){
+  static_topics = topics;
+}
