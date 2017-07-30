@@ -80,7 +80,7 @@ tx_queue = Queue()
 
 def mqtt_message(client, userdata, msg):
     payload = msg.topic.encode() + b'\x00'+msg.payload
-    if client.verbose > 1:
+    if client.verbose > 2:
         print('Distributing message {payload} of "{topic}"'.format(payload=msg.payload, topic=msg.topic))
     for client in mqtt.subscribed_clients(msg.topic):
         tx_queue.put((client, payload, RETRIES))
@@ -134,7 +134,7 @@ def main(host, port, channel, statistics, retain, verbose):
             elif _type == 'p':
                 nodeID = mesh.getNodeID(header.from_node)
                 mesh.write(payload, ord('r'), nodeID)
-                if verbose > 2:
+                if verbose > 3:
                     print("Reply for ping from", nodeID)
             elif _type == "S":
                 topic = payload.decode()
