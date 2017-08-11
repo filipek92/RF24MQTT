@@ -17,6 +17,7 @@ bool RF24MQTT::connect(const char name[]){
       subscribe(static_topics[i]);
     }
   }
+  return true;
 }
 
 bool RF24MQTT::disconnect(){
@@ -63,7 +64,6 @@ bool RF24MQTT::incomingMessage(RF24NetworkHeader& header){
 
 bool RF24MQTT::checkConnection(){
   RF24NetworkHeader header;
-  uint8_t data[MQTT_MAX_LENGHT];
   ping_cnt++;
 
   if(!mesh.checkConnection()){
