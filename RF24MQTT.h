@@ -60,7 +60,7 @@ class RF24MQTT
    * @param _mesh The underlying mesh instance
    */
 
-  RF24MQTT(RF24& _radio, RF24Network& _network, RF24Mesh& _mesh);
+  RF24MQTT(RF24& _radio, RF24Network& _network, RF24Mesh& _mesh, const char name[]=NULL);
 
    /**
    * Very similar to network.update(), it needs to be called regularly to keep the network
@@ -76,11 +76,11 @@ class RF24MQTT
   
   bool checkConnection();
 
-  bool connect(const char name[]);
+  bool connect(const char name[]=NULL);
   bool disconnect();
 
   inline int publish(const char topic[], const char payload[], bool retained=false) {return publish(topic, payload, strlen(payload), retained);}
-  int publish(const char topic[], void* payload, byte length, bool retained=false);
+  int publish(const char topic[], const void* payload, byte length, bool retained=false);
 
 
   bool subscribe(const char topic[], unsigned char qos = 0);
@@ -90,7 +90,7 @@ class RF24MQTT
   void setStaticTopics(topics_t topics);
 
   private:
-  void proccessMessage(RF24NetworkHeader& header, void* payload, byte length);
+  void proccessMessage(RF24NetworkHeader& header, const void* payload, byte length);
   void dispatchMessage(RF24NetworkHeader& header);
   bool incomingMessage(RF24NetworkHeader& header);
 
@@ -100,7 +100,7 @@ class RF24MQTT
   mqtt_callback_t callback;
 
   char **static_topics;
-  char *client_name;
+  const char *client_name;
   
   RF24& radio;
   RF24Network& network;
